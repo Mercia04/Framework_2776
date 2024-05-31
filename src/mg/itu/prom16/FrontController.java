@@ -50,6 +50,13 @@ public class FrontController extends HttpServlet{
         HashMap<String,MyMapping> rep=getMap();    
         MyMapping lMapping=rep.get(url);
         String val="Classe= "+lMapping.getClasse()+"  Methode= "+lMapping.getMethode();
+        Class<?> clazz=Class.forName(lMapping.getClasse());
+        Object instance=clazz.getDeclaredConstructor().newInstance();
+        Method method=clazz.getMethod(lMapping.getMethode());
+        Object returnval=method.invoke(instance);
+        if(returnval instanceof String){
+            val=val+" Reponse= "+(String)returnval;
+        }
         out.println(val);
         } catch (Exception e) {
             String ex=new String("Methode not found");
