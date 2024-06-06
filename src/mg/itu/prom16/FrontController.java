@@ -1,14 +1,18 @@
 package mg.itu.prom16;
+
 import java.io.*;
 import java.lang.reflect.Method;
 import java.util.HashMap;
-
+import jakarta.servlet.RequestDispatcher;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.*;
-import jakarta.servlet.http.*;
-import mg.itu.prom16.annotation.*;
-public class FrontController extends HttpServlet{
-    protected HashMap<String,MyMapping> map=new HashMap<>();
+import jakarta.servlet.http.HttpServletResponse;
+import mg.itu.prom16.annotation.MyAnnotation;
+import mg.itu.prom16.annotation.MyGet;
+
+public class FrontController extends HttpServlet {
+    protected HashMap<String, MyMapping> map = new HashMap<>();
 
     public HashMap<String, MyMapping> getMap() {
         return map;
@@ -18,73 +22,106 @@ public class FrontController extends HttpServlet{
         this.map = map;
     }
 
-    public void init() throws ServletException{
+    public void init() throws ServletException {
         super.init();
-        String cont=getServletContext().getInitParameter("controler");
-        HashMap<String,MyMapping> maps=getMap();
+        String cont = getServletContext().getInitParameter("controler");
         try {
-            maps=this.getControllerList(maps,cont);
-            this.setMap(maps); 
+            map = this.getControllerList(map, cont);
+            if (map.isEmpty()) {
+                throw new ServletException("Le package ne contient aucun controleur.");
+            }
         } catch (Exception e) {
-            e.printStackTrace();
+            throw new ServletException("Erreur lors de l'initialisation des controleurs: " + e.getMessage(), e);
         }
-        
-    }
-    
-    protected void doGet(HttpServletRequest req, HttpServletResponse res) throws ServletException, IOException {
-            processRequest(req, res);
-    }
-    protected void doPost(HttpServletRequest req, HttpServletResponse res) throws ServletException, IOException {
-            processRequest(req, res);
-    }
-    protected String mySplit(String text){
-        String[] lolo=text.split("/");
-        int length=lolo.length;
-            return lolo[length-1];
     }
 
-    protected void processRequest(HttpServletRequest req, HttpServletResponse res) throws ServletException, IOException{
+    protected void doGet(HttpServletRequest req, HttpServletResponse res) throws ServletException, IOException {
+        processRequest(req, res);
+    }
+
+    protected void doPost(HttpServletRequest req, HttpServletResponse res) throws ServletException, IOException {
+        processRequest(req, res);
+    }
+
+    protected String mySplit(String text) {
+        String[] lolo = text.split("/");
+        return lolo[lolo.length - 1];
+    }
+
+    protected void processRequest(HttpServletRequest req, HttpServletResponse res) throws ServletException, IOException {
         PrintWriter out = res.getWriter();
         try {
-        String url=mySplit(req.getRequestURL().toString());
-        HashMap<String,MyMapping> rep=getMap();    
-        MyMapping lMapping=rep.get(url);
-        String val="Classe= "+lMapping.getClasse()+"  Methode= "+lMapping.getMethode();
-        Class<?> clazz=Class.forName(lMapping.getClasse());
-        Object instance=clazz.getDeclaredConstructor().newInstance();
-        Method method=clazz.getMethod(lMapping.getMethode());
-        Object returnval=method.invoke(instance);
-        if(returnval instanceof String){
-            val=val+" Reponse= "+(String)returnval;
-        }
-        out.println(val);
+            String url = mySplit(req.getRequestURL().toString());
+            MyMapping lMapping = map.get(url);
+            if (lMapping == null) {
+                throw new ServletException("Aucun mapping trouver pour l'URL : " + url);
+            }
+
+            String val = "Classe= " + lMapping.getClasse() + "  Methode= " + lMapping.getMethode();
+            Class<?> clazz = Class.forName(lMapping.getClasse());
+            Object instance = clazz.getDeclaredConstructor().newInstance();
+            Method method = clazz.getMethod(lMapping.getMethode());
+            Object returnval = method.invoke(instance);
+
+            if (returnval instanceof String) {
+                val += " Reponse= " + returnval;
+                out.println(val);
+            } else if (returnval instanceof ModelView) {
+                ModelView modelView = (ModelView) returnval;
+                HashMap<String, Object> data = modelView.getData();
+                String urlData = modelView.getUrl();
+
+                data.forEach(req::setAttribute);
+
+                RequestDispatcher dispatcher = req.getRequestDispatcher(urlData);
+                dispatcher.forward(req, res);
+            } else {
+                throw new ServletException("Type de retour non supporter : " + returnval.getClass().getName());
+            }
+        } catch (ServletException e) {
+            handleError(req, res, e.getMessage());
         } catch (Exception e) {
-            String ex=new String("Methode not found");
-            out.println(ex);
+            e.printStackTrace(out); // Afficher la trace complète de l'exception
+            handleError(req, res, "Erreur interne du serveur.");
         }
     }
 
-    public HashMap<String,MyMapping> getControllerList(HashMap<String,MyMapping> map, String packagename) throws Exception {
+    public HashMap<String, MyMapping> getControllerList(HashMap<String, MyMapping> map, String packagename) throws Exception {
         String bin_path = "WEB-INF/classes/" + packagename.replace(".", "/");
         bin_path = getServletContext().getRealPath(bin_path);
 
         File b = new File(bin_path);
+        if (!b.exists() || !b.isDirectory()) {
+            throw new ServletException("Le package specifie n'existe pas ou ne contient aucun controleur.");
+        }
+
         for (File onefile : b.listFiles()) {
             if (onefile.isFile() && onefile.getName().endsWith(".class")) {
                 Class<?> clazz = Class.forName(packagename + "." + onefile.getName().split(".class")[0]);
-                 if (clazz.isAnnotationPresent(MyAnnotation.class)){
-                    Method[] methods=clazz.getMethods();
-                    String classe=clazz.getName();
+                if (clazz.isAnnotationPresent(MyAnnotation.class)) {
+                    Method[] methods = clazz.getMethods();
                     for (Method method : methods) {
                         if (method.isAnnotationPresent(MyGet.class)) {
-                            String nomMethode=method.getName();
-                            MyMapping myMapping=new MyMapping(classe,nomMethode);
-                            map.put((String)method.getAnnotation(MyGet.class).value(),myMapping);
+                            String url = method.getAnnotation(MyGet.class).value();
+                            if (map.containsKey(url)) {
+                                throw new ServletException("L'URL " + url + " est gerer par plusieurs controleurs.");
+                            }
+                            MyMapping myMapping = new MyMapping(clazz.getName(), method.getName());
+                            map.put(url, myMapping);
                         }
                     }
                 }
             }
         }
         return map;
+    }
+
+    private void handleError(HttpServletRequest req, HttpServletResponse res, String message) throws IOException {
+        res.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+        PrintWriter out = res.getWriter();
+        out.println("<html><body>");
+        out.println("<h2>Error:</h2>");
+        out.println("<p>" + message + "</p>");
+        out.println("</body></html>");
     }
 }
