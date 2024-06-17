@@ -7,7 +7,7 @@ SET "SRC_CLASSES=bin"
 
 
 REM Compilation des classes Java
-javac -d %CLASSES_DIR% -sourcepath src %SRC_DIR%
+javac -parameters -d %CLASSES_DIR% -sourcepath src %SRC_DIR%
 
 cd %CLASSES_DIR%
 jar -cvf "..\jars\framework_2776.jar" *

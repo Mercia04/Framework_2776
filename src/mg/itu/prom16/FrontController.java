@@ -2,6 +2,8 @@ package mg.itu.prom16;
 
 import java.io.*;
 import java.lang.reflect.Method;
+import java.lang.reflect.Parameter;
+import java.util.ArrayList;
 import java.util.HashMap;
 import jakarta.servlet.RequestDispatcher;
 import jakarta.servlet.ServletException;
@@ -10,6 +12,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import mg.itu.prom16.annotation.MyAnnotation;
 import mg.itu.prom16.annotation.MyGet;
+import mg.itu.prom16.annotation.MyParam;
 
 public class FrontController extends HttpServlet {
     protected HashMap<String, MyMapping> map = new HashMap<>();
@@ -61,7 +64,31 @@ public class FrontController extends HttpServlet {
             Class<?> clazz = Class.forName(lMapping.getClasse());
             Object instance = clazz.getDeclaredConstructor().newInstance();
             Method method = clazz.getMethod(lMapping.getMethode());
-            Object returnval = method.invoke(instance);
+            Method methodP=null;
+            Method[] declaredMethods=clazz.getDeclaredMethods();
+            for (Method method2 : declaredMethods) {
+                if (method2.getName().equals(lMapping.getMethode())) {
+                    methodP=method2;
+                    break;
+                }
+            }
+            Parameter[] parameters=methodP.getParameters();
+            Object[] args=new Object[parameters.length];
+            ArrayList<String> parameterNames=new ArrayList<String>();
+            String paramValue=null;
+            for(int i=0;i<parameters.length;i++){
+                Parameter parameter=parameters[i];
+                parameterNames.add(parameter.getName());
+                if (parameter.isAnnotationPresent(MyParam.class)) {
+                    MyParam annotationMyParam=parameter.getAnnotation(MyParam.class);
+                    paramValue=req.getParameter(annotationMyParam.name());
+                    args[i]=paramValue;
+                } else{
+                    paramValue=req.getParameter(parameter.getName());
+                    args[i]=paramValue;
+                }
+            }
+            Object returnval = method.invoke(instance,args);
 
             if (returnval instanceof String) {
                 val += " Reponse= " + returnval;
@@ -81,7 +108,7 @@ public class FrontController extends HttpServlet {
         } catch (ServletException e) {
             handleError(req, res, e.getMessage());
         } catch (Exception e) {
-            e.printStackTrace(out); // Afficher la trace complète de l'exception
+            e.printStackTrace(out);
             handleError(req, res, "Erreur interne du serveur.");
         }
     }
