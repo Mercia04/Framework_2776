@@ -1,40 +1,43 @@
 package mg.itu.prom16;
 
 import java.io.*;
+import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
-import java.util.ArrayList;
 import java.util.HashMap;
 import jakarta.servlet.RequestDispatcher;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import mg.itu.prom16.annotation.FieldName;
 import mg.itu.prom16.annotation.MyAnnotation;
 import mg.itu.prom16.annotation.MyGet;
 import mg.itu.prom16.annotation.MyParam;
+import mg.itu.prom16.annotation.ParamObject;
 
 public class FrontController extends HttpServlet {
-    protected HashMap<String, MyMapping> map = new HashMap<>();
+    // Mapping des URL vers les méthodes des contrôleurs
+    protected HashMap<String, MyMapping> carte = new HashMap<>();
 
-    public HashMap<String, MyMapping> getMap() {
-        return map;
+    public HashMap<String, MyMapping> getCarte() {
+        return carte;
     }
 
-    public void setMap(HashMap<String, MyMapping> map) {
-        this.map = map;
+    public void setCarte(HashMap<String, MyMapping> carte) {
+        this.carte = carte;
     }
 
     public void init() throws ServletException {
         super.init();
-        String cont = getServletContext().getInitParameter("controler");
+        String controleur = getServletContext().getInitParameter("controler");
         try {
-            map = this.getControllerList(map, cont);
-            if (map.isEmpty()) {
-                throw new ServletException("Le package ne contient aucun controleur.");
+            carte = this.getControllerList(carte, controleur);
+            if (carte.isEmpty()) {
+                throw new ServletException("Le package ne contient aucun contrôleur.");
             }
         } catch (Exception e) {
-            throw new ServletException("Erreur lors de l'initialisation des controleurs: " + e.getMessage(), e);
+            throw new ServletException("Erreur lors de l'initialisation des contrôleurs: " + e.getMessage(), e);
         }
     }
 
@@ -46,73 +49,121 @@ public class FrontController extends HttpServlet {
         processRequest(req, res);
     }
 
-    protected String mySplit(String text) {
-        String[] lolo = text.split("/");
-        return lolo[lolo.length - 1];
+    // Extrait la dernière partie de l'URL après "/"
+    protected String mySplit(String texte) {
+        String[] parties = texte.split("/");
+        return parties[parties.length - 1];
     }
 
     protected void processRequest(HttpServletRequest req, HttpServletResponse res) throws ServletException, IOException {
         PrintWriter out = res.getWriter();
         try {
+            // Obtenir l'URL demandée et trouver le mapping correspondant
             String url = mySplit(req.getRequestURL().toString());
-            MyMapping lMapping = map.get(url);
-            if (lMapping == null) {
-                throw new ServletException("Aucun mapping trouver pour l'URL : " + url);
+            MyMapping mapping = carte.get(url);
+            if (mapping == null) {
+                throw new ServletException("Aucun mapping trouvé pour l'URL : " + url);
             }
 
-            String val = "Classe= " + lMapping.getClasse() + "  Methode= " + lMapping.getMethode();
-            Class<?> clazz = Class.forName(lMapping.getClasse());
-            Object instance = clazz.getDeclaredConstructor().newInstance();
-            Method method = clazz.getMethod(lMapping.getMethode());
-            Method methodP=null;
-            Method[] declaredMethods=clazz.getDeclaredMethods();
-            for (Method method2 : declaredMethods) {
-                if (method2.getName().equals(lMapping.getMethode())) {
-                    methodP=method2;
+            // Charger la classe et créer une instance
+            Class<?> classe = Class.forName(mapping.getClasse());
+            Object instance = classe.getDeclaredConstructor().newInstance();
+
+            // Obtenir la méthode à invoquer
+            Method[] methods=classe.getDeclaredMethods();
+            Method methode=null;
+            for (Method method1 : methods) {
+                if (method1.getName().equals(mapping.getMethode())) {
+                    methode = method1;
                     break;
                 }
             }
-            Parameter[] parameters=methodP.getParameters();
-            Object[] args=new Object[parameters.length];
-            ArrayList<String> parameterNames=new ArrayList<String>();
-            String paramValue=null;
-            for(int i=0;i<parameters.length;i++){
-                Parameter parameter=parameters[i];
-                parameterNames.add(parameter.getName());
-                if (parameter.isAnnotationPresent(MyParam.class)) {
-                    MyParam annotationMyParam=parameter.getAnnotation(MyParam.class);
-                    paramValue=req.getParameter(annotationMyParam.name());
-                    args[i]=paramValue;
-                } else{
-                    paramValue=req.getParameter(parameter.getName());
-                    args[i]=paramValue;
+            Parameter[] parametres = methode.getParameters();
+            Object[] arguments = new Object[parametres.length];
+
+            // Traiter les paramètres de la méthode
+            for (int i = 0; i < parametres.length; i++) {
+                Parameter parametre = parametres[i];
+                if (parametre.isAnnotationPresent(MyParam.class)) {
+                    // Si le paramètre a une annotation @MyParam, utiliser son nom
+                    MyParam annotationMyParam = parametre.getAnnotation(MyParam.class);
+                    arguments[i] = req.getParameter(annotationMyParam.name());
+                } else if (parametre.isAnnotationPresent(ParamObject.class)) {
+                    // Si le paramètre a une annotation @ParamObject, créer l'objet à partir de la requête
+                    arguments[i] = creerObjetDepuisRequete(parametre.getType(), req);
+                } else {
+                    // Utiliser le nom du paramètre s'il n'y a pas d'annotation
+                    arguments[i] = req.getParameter(parametre.getName());
                 }
             }
-            Object returnval = method.invoke(instance,args);
 
-            if (returnval instanceof String) {
-                val += " Reponse= " + returnval;
-                out.println(val);
-            } else if (returnval instanceof ModelView) {
-                ModelView modelView = (ModelView) returnval;
-                HashMap<String, Object> data = modelView.getData();
-                String urlData = modelView.getUrl();
+            // Invoquer la méthode du contrôleur avec les arguments
+            Object retour = methode.invoke(instance, arguments);
 
-                data.forEach(req::setAttribute);
+            // Traiter la réponse du contrôleur
+            if (retour instanceof String) {
+                out.println(retour);
+            } else if (retour instanceof ModelView) {
+                ModelView vueModele = (ModelView) retour;
+                HashMap<String, Object> donnees = vueModele.getData();
+                String urlVue = vueModele.getUrl();
 
-                RequestDispatcher dispatcher = req.getRequestDispatcher(urlData);
+                // Ajouter les données au contexte de la requête
+                donnees.forEach(req::setAttribute);
+
+                // Rediriger vers la vue appropriée
+                RequestDispatcher dispatcher = req.getRequestDispatcher(urlVue);
                 dispatcher.forward(req, res);
             } else {
-                throw new ServletException("Type de retour non supporter : " + returnval.getClass().getName());
+                throw new ServletException("Type de retour non supporte : " + retour.getClass().getName());
             }
         } catch (ServletException e) {
-            handleError(req, res, e.getMessage());
+            gererErreur(req, res, e.getMessage());
         } catch (Exception e) {
             e.printStackTrace(out);
-            handleError(req, res, "Erreur interne du serveur.");
+            gererErreur(req, res, "Erreur interne du serveur.");
         }
+    } 
+
+    // Créer un objet à partir des paramètres de la requête
+    private Object creerObjetDepuisRequete(Class<?> classe, HttpServletRequest req) throws Exception {
+        Object obj = classe.getDeclaredConstructor().newInstance();
+        Field[] champs = classe.getDeclaredFields();
+        
+        for (Field champ : champs) {
+            champ.setAccessible(true);
+            String nomParam = champ.getName();
+            
+            if (champ.isAnnotationPresent(FieldName.class)) {
+                FieldName annotationFieldName = champ.getAnnotation(FieldName.class);
+                nomParam = annotationFieldName.value();
+            }
+    
+            String valeurParam = req.getParameter(nomParam);
+            
+            if (valeurParam != null && !valeurParam.isEmpty()) {
+                champ.set(obj, convertirTypeChamp(champ, valeurParam));
+            }
+        }
+        return obj;
     }
 
+    // Convertir les valeurs des paramètres de la requête en types appropriés
+    private Object convertirTypeChamp(Field champ, String valeurParam) {
+        Class<?> typeChamp = champ.getType();
+        if (typeChamp == int.class || typeChamp == Integer.class) {
+            return Integer.parseInt(valeurParam);
+        } else if (typeChamp == long.class || typeChamp == Long.class) {
+            return Long.parseLong(valeurParam);
+        } else if (typeChamp == double.class || typeChamp == Double.class) {
+            return Double.parseDouble(valeurParam);
+        } else if (typeChamp == boolean.class || typeChamp == Boolean.class) {
+            return Boolean.parseBoolean(valeurParam);
+        }
+        // Pour les types String ou d'autres types, retournez simplement la valeur brute
+        return valeurParam;
+    }
+    
     public HashMap<String, MyMapping> getControllerList(HashMap<String, MyMapping> map, String packagename) throws Exception {
         String bin_path = "WEB-INF/classes/" + packagename.replace(".", "/");
         bin_path = getServletContext().getRealPath(bin_path);
@@ -143,7 +194,8 @@ public class FrontController extends HttpServlet {
         return map;
     }
 
-    private void handleError(HttpServletRequest req, HttpServletResponse res, String message) throws IOException {
+    // Gérer les erreurs et afficher un message approprié
+    private void gererErreur(HttpServletRequest req, HttpServletResponse res, String message) throws IOException {
         res.setStatus(HttpServletResponse.SC_BAD_REQUEST);
         PrintWriter out = res.getWriter();
         out.println("<html><body>");
