@@ -17,7 +17,6 @@ import mg.itu.prom16.annotation.MyParam;
 import mg.itu.prom16.annotation.ParamObject;
 
 public class FrontController extends HttpServlet {
-    // Mapping des URL vers les méthodes des contrôleurs
     protected HashMap<String, MyMapping> carte = new HashMap<>();
 
     public HashMap<String, MyMapping> getCarte() {
@@ -49,7 +48,6 @@ public class FrontController extends HttpServlet {
         processRequest(req, res);
     }
 
-    // Extrait la dernière partie de l'URL après "/"
     protected String mySplit(String texte) {
         String[] parties = texte.split("/");
         return parties[parties.length - 1];
@@ -58,18 +56,15 @@ public class FrontController extends HttpServlet {
     protected void processRequest(HttpServletRequest req, HttpServletResponse res) throws ServletException, IOException {
         PrintWriter out = res.getWriter();
         try {
-            // Obtenir l'URL demandée et trouver le mapping correspondant
             String url = mySplit(req.getRequestURL().toString());
             MyMapping mapping = carte.get(url);
             if (mapping == null) {
                 throw new ServletException("Aucun mapping trouvé pour l'URL : " + url);
             }
 
-            // Charger la classe et créer une instance
             Class<?> classe = Class.forName(mapping.getClasse());
             Object instance = classe.getDeclaredConstructor().newInstance();
 
-            // Obtenir la méthode à invoquer
             Method[] methods=classe.getDeclaredMethods();
             Method methode=null;
             for (Method method1 : methods) {
@@ -81,26 +76,22 @@ public class FrontController extends HttpServlet {
             Parameter[] parametres = methode.getParameters();
             Object[] arguments = new Object[parametres.length];
 
-            // Traiter les paramètres de la méthode
             for (int i = 0; i < parametres.length; i++) {
                 Parameter parametre = parametres[i];
                 if (parametre.isAnnotationPresent(MyParam.class)) {
-                    // Si le paramètre a une annotation @MyParam, utiliser son nom
                     MyParam annotationMyParam = parametre.getAnnotation(MyParam.class);
                     arguments[i] = req.getParameter(annotationMyParam.name());
                 } else if (parametre.isAnnotationPresent(ParamObject.class)) {
-                    // Si le paramètre a une annotation @ParamObject, créer l'objet à partir de la requête
                     arguments[i] = creerObjetDepuisRequete(parametre.getType(), req);
+                } else if (parametre.getType() == MySession.class) {
+                    arguments[i] = new MySession(req.getSession());
                 } else {
-                    // Utiliser le nom du paramètre s'il n'y a pas d'annotation
-                    arguments[i] = req.getParameter(parametre.getName());
+                    throw new ServletException("ETU002776-Mila asina annotation ny parametre");
                 }
             }
 
-            // Invoquer la méthode du contrôleur avec les arguments
             Object retour = methode.invoke(instance, arguments);
 
-            // Traiter la réponse du contrôleur
             if (retour instanceof String) {
                 out.println(retour);
             } else if (retour instanceof ModelView) {
@@ -111,7 +102,6 @@ public class FrontController extends HttpServlet {
                 // Ajouter les données au contexte de la requête
                 donnees.forEach(req::setAttribute);
 
-                // Rediriger vers la vue appropriée
                 RequestDispatcher dispatcher = req.getRequestDispatcher(urlVue);
                 dispatcher.forward(req, res);
             } else {
