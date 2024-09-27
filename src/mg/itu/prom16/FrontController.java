@@ -5,6 +5,9 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
 import java.util.HashMap;
+
+import com.google.gson.Gson;
+
 import jakarta.servlet.RequestDispatcher;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServlet;
@@ -15,6 +18,7 @@ import mg.itu.prom16.annotation.MyAnnotation;
 import mg.itu.prom16.annotation.MyGet;
 import mg.itu.prom16.annotation.MyParam;
 import mg.itu.prom16.annotation.ParamObject;
+import mg.itu.prom16.annotation.Restapi;
 
 public class FrontController extends HttpServlet {
     protected HashMap<String, MyMapping> carte = new HashMap<>();
@@ -92,20 +96,35 @@ public class FrontController extends HttpServlet {
 
             Object retour = methode.invoke(instance, arguments);
 
-            if (retour instanceof String) {
-                out.println(retour);
-            } else if (retour instanceof ModelView) {
-                ModelView vueModele = (ModelView) retour;
-                HashMap<String, Object> donnees = vueModele.getData();
-                String urlVue = vueModele.getUrl();
+            //verifier_na le annotation restapi
+            if (methode.isAnnotationPresent(Restapi.class)) {
+                res.setContentType("application/json");
+                Gson gson = new Gson();
 
-                // Ajouter les données au contexte de la requête
-                donnees.forEach(req::setAttribute);
-
-                RequestDispatcher dispatcher = req.getRequestDispatcher(urlVue);
-                dispatcher.forward(req, res);
+                //mamadika json
+                if (retour instanceof ModelView) {
+                    ModelView vueModele = (ModelView) retour;
+                    out.print(gson.toJson(vueModele.getData()));
+                } else {
+                    out.print(gson.toJson(retour));
+                }
             } else {
-                throw new ServletException("Type de retour non supporte : " + retour.getClass().getName());
+                //raha tsisy annotation @Restapi
+                if (retour instanceof String) {
+                    out.println(retour);
+                } else if (retour instanceof ModelView) {
+                    ModelView vueModele = (ModelView) retour;
+                    HashMap<String, Object> donnees = vueModele.getData();
+                    String urlVue = vueModele.getUrl();
+
+                    // Ajouter les données
+                    donnees.forEach(req::setAttribute);
+
+                    RequestDispatcher dispatcher = req.getRequestDispatcher(urlVue);
+                    dispatcher.forward(req, res);
+                } else {
+                    throw new ServletException("Type de retour non supporte : " + retour.getClass().getName());
+                }
             }
         } catch (ServletException e) {
             gererErreur(req, res, e.getMessage());

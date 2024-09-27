@@ -6,7 +6,8 @@
         "c:\\Work\\sprint\\Test\\lib\\jakarta.el-api-5.0.0.jar",
         "c:\\Work\\sprint\\Test\\lib\\jakarta.servlet.jsp.jstl-api-3.0.0.jar",
         "c:\\Work\\sprint\\Test\\lib\\jakarta.servlet-api-6.1.0-M2.jar",
-        "c:\\Work\\sprint\\Test\\lib\\servlet-api-0.19.1.jar"
+        "c:\\Work\\sprint\\Test\\lib\\servlet-api-0.19.1.jar",
+        "c:\\Work\\sprint\\Test\\lib\\gson-2.8.2.jar"
     ],
     "java.settings.compilerArgs": ["-parameters"]
 }
