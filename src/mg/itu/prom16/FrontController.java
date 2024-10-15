@@ -5,6 +5,7 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
 import java.util.HashMap;
+import java.util.List;
 
 import com.google.gson.Gson;
 
@@ -14,10 +15,12 @@ import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import mg.itu.prom16.annotation.FieldName;
+import mg.itu.prom16.annotation.Get;
 import mg.itu.prom16.annotation.MyAnnotation;
 import mg.itu.prom16.annotation.MyGet;
 import mg.itu.prom16.annotation.MyParam;
 import mg.itu.prom16.annotation.ParamObject;
+import mg.itu.prom16.annotation.Post;
 import mg.itu.prom16.annotation.Restapi;
 
 public class FrontController extends HttpServlet {
@@ -63,7 +66,9 @@ public class FrontController extends HttpServlet {
             String url = mySplit(req.getRequestURL().toString());
             MyMapping mapping = carte.get(url);
             if (mapping == null) {
-                throw new ServletException("Aucun mapping trouvé pour l'URL : " + url);
+                res.setStatus(HttpServletResponse.SC_NOT_FOUND);
+                res.setContentType("text/plain");
+                res.getWriter().println("Erreur 404 : url tsy misy ao @ mapping");
             }
 
             Class<?> classe = Class.forName(mapping.getClasse());
@@ -72,9 +77,12 @@ public class FrontController extends HttpServlet {
             Method[] methods=classe.getDeclaredMethods();
             Method methode=null;
             for (Method method1 : methods) {
-                if (method1.getName().equals(mapping.getMethode())) {
-                    methode = method1;
-                    break;
+                List<VerbMethode> lverbMethodes=mapping.getList();
+                for (VerbMethode verbMethode : lverbMethodes) {     
+                    if (method1.getName().equals(verbMethode)) {
+                        methode = method1;
+                        break;
+                    }
                 }
             }
             Parameter[] parametres = methode.getParameters();
@@ -190,10 +198,18 @@ public class FrontController extends HttpServlet {
                     for (Method method : methods) {
                         if (method.isAnnotationPresent(MyGet.class)) {
                             String url = method.getAnnotation(MyGet.class).value();
+                            String temp="GET";
                             if (map.containsKey(url)) {
                                 throw new ServletException("L'URL " + url + " est gerer par plusieurs controleurs.");
                             }
-                            MyMapping myMapping = new MyMapping(clazz.getName(), method.getName());
+                            if (method.isAnnotationPresent(Get.class)) {
+                                temp="GET";
+                            } else if (method.isAnnotationPresent(Post.class)) {
+                                temp="POST";
+                            }
+                            VerbMethode verbMethode=new VerbMethode(method.getName(), temp);
+                            MyMapping myMapping = new MyMapping(clazz.getName());
+                            myMapping.addList(verbMethode);
                             map.put(url, myMapping);
                         }
                     }
@@ -202,7 +218,6 @@ public class FrontController extends HttpServlet {
         }
         return map;
     }
-
     // Gérer les erreurs et afficher un message approprié
     private void gererErreur(HttpServletRequest req, HttpServletResponse res, String message) throws IOException {
         res.setStatus(HttpServletResponse.SC_BAD_REQUEST);
