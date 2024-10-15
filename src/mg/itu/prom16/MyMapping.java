@@ -1,23 +1,31 @@
 package mg.itu.prom16;
 
+import java.util.List;
+
 public class MyMapping {
     private String classe;
-    private String methode;
+    private List<VerbMethode> list;
+
+    public MyMapping(String a){
+        this.setClasse(a);
+    }
+
     public String getClasse() {
         return classe;
     }
     public void setClasse(String classe) {
         this.classe = classe;
     }
-    public String getMethode() {
-        return methode;
+    public List<VerbMethode> getList() {
+        return list;
     }
-    public void setMethode(String methode) {
-        this.methode = methode;
+    public void setList(List<VerbMethode> list) {
+        this.list = list;
     }
-    public MyMapping(String classe,String methode){
-        this.setClasse(classe);
-        this.setMethode(methode);
+
+    public void addList(VerbMethode verbMethode){
+        List<VerbMethode> tem= this.getList();
+        tem.add(verbMethode);
     }
 
 }
