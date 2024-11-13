@@ -159,15 +159,22 @@ public class FrontController extends HttpServlet {
             String valeurParam = req.getParameter(nomParam);
             
             if (valeurParam != null && !valeurParam.isEmpty()) {
-                champ.set(obj, convertirTypeChamp(champ, valeurParam));
+                champ.set(obj, convertirTypeChamp(champ, valeurParam,req));
             }
         }
         return obj;
     }
 
     // Convertir les valeurs des paramètres de la requête en types appropriés
-    private Object convertirTypeChamp(Field champ, String valeurParam) {
+    private Object convertirTypeChamp(Field champ, String valeurParam, HttpServletRequest req) {
         Class<?> typeChamp = champ.getType();
+        if (typeChamp == FileUpload.class) {
+            try {
+                return FileUpload.handleFileUpload(req);
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
         if (typeChamp == int.class || typeChamp == Integer.class) {
             return Integer.parseInt(valeurParam);
         } else if (typeChamp == long.class || typeChamp == Long.class) {
