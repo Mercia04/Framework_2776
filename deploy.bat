@@ -1,4 +1,8 @@
 @echo off
+if errorlevel 1 (
+        pause
+        exit /b 1
+)
 
 REM Nom de votre application
 SET "CLASSES_DIR=bin"
@@ -12,8 +16,3 @@ javac -parameters -d %CLASSES_DIR% -sourcepath src %SRC_DIR% -cp %Lib_dir%
 
 cd %CLASSES_DIR%
 jar -cvf "..\jars\framework_2776.jar" *
-
-if errorlevel 1 (
-        pause
-        exit /b 1
-)
