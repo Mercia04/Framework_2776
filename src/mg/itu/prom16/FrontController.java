@@ -4,6 +4,8 @@ import java.io.*;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
 import java.util.HashMap;
 import java.util.List;
 
@@ -14,14 +16,8 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import mg.itu.prom16.annotation.FieldName;
-import mg.itu.prom16.annotation.Get;
-import mg.itu.prom16.annotation.MyAnnotation;
-import mg.itu.prom16.annotation.MyGet;
-import mg.itu.prom16.annotation.MyParam;
-import mg.itu.prom16.annotation.ParamObject;
-import mg.itu.prom16.annotation.Post;
-import mg.itu.prom16.annotation.Restapi;
+import mg.itu.prom16.annotation.*;
+import mg.itu.prom16.validation.*;
 
 public class FrontController extends HttpServlet {
     protected HashMap<String, MyMapping> carte = new HashMap<>();
@@ -167,6 +163,31 @@ public class FrontController extends HttpServlet {
 
     // Convertir les valeurs des paramètres de la requête en types appropriés
     private Object convertirTypeChamp(Field champ, String valeurParam, HttpServletRequest req) {
+        if (champ.isAnnotationPresent(MyNumeric.class)) {
+            MyNumeric numericAnnotation = champ.getAnnotation(MyNumeric.class);
+            if (!NumericValidator.isValidNumeric(valeurParam, numericAnnotation.min(), numericAnnotation.max())) {
+                throw new RuntimeException(numericAnnotation.message());
+            }
+            // Convert to appropriate numeric type
+            if (champ.getType() == int.class || champ.getType() == Integer.class) {
+                return Integer.parseInt(valeurParam);
+            } else if (champ.getType() == double.class || champ.getType() == Double.class) {
+                return Double.parseDouble(valeurParam);
+            }
+        }
+        if (champ.isAnnotationPresent(MyDate.class)) {
+            MyDate dateAnnotation = champ.getAnnotation(MyDate.class);
+            if (!DateValidator.isValidDate(valeurParam, dateAnnotation.format())) {
+                throw new RuntimeException(dateAnnotation.message());
+            }
+            // Convert to Date object if validation passes
+            try {
+                SimpleDateFormat dateFormat = new SimpleDateFormat(dateAnnotation.format());
+                return dateFormat.parse(valeurParam);
+            } catch (ParseException e) {
+                throw new RuntimeException("Error parsing date");
+            }
+        }
         Class<?> typeChamp = champ.getType();
         if (typeChamp == FileUpload.class) {
             try {
