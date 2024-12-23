@@ -21,6 +21,7 @@ import mg.itu.prom16.validation.*;
 
 public class FrontController extends HttpServlet {
     protected HashMap<String, MyMapping> carte = new HashMap<>();
+    
 
     public HashMap<String, MyMapping> getCarte() {
         return carte;
@@ -58,6 +59,8 @@ public class FrontController extends HttpServlet {
 
     protected void processRequest(HttpServletRequest req, HttpServletResponse res) throws ServletException, IOException {
         PrintWriter out = res.getWriter();
+        HashMap<String,String> erreurs=new HashMap<>();
+        HashMap<String, String> submittedValues = new HashMap<>();
         try {
             String url = mySplit(req.getRequestURL().toString());
             MyMapping mapping = carte.get(url);
@@ -74,13 +77,16 @@ public class FrontController extends HttpServlet {
             Method methode=null;
             for (Method method1 : methods) {
                 List<VerbMethode> lverbMethodes=mapping.getList();
-                for (VerbMethode verbMethode : lverbMethodes) {     
-                    if (method1.getName().equals(verbMethode)) {
+                for (VerbMethode verbMethode : lverbMethodes) {
+                    System.out.println("Recherche de méthode : " + method1.getName() + " avec " + verbMethode.getVerb());
+                    if (method1.getName().equals(verbMethode.getVerb())) {
                         methode = method1;
                         break;
                     }
                 }
+                
             }
+
             Parameter[] parametres = methode.getParameters();
             Object[] arguments = new Object[parametres.length];
 
@@ -90,7 +96,7 @@ public class FrontController extends HttpServlet {
                     MyParam annotationMyParam = parametre.getAnnotation(MyParam.class);
                     arguments[i] = req.getParameter(annotationMyParam.name());
                 } else if (parametre.isAnnotationPresent(ParamObject.class)) {
-                    arguments[i] = creerObjetDepuisRequete(parametre.getType(), req);
+                    arguments[i] = creerObjetDepuisRequete(parametre.getType(),req,erreurs,submittedValues);
                 } else if (parametre.getType() == MySession.class) {
                     arguments[i] = new MySession(req.getSession());
                 } else {
@@ -120,12 +126,20 @@ public class FrontController extends HttpServlet {
                     ModelView vueModele = (ModelView) retour;
                     HashMap<String, Object> donnees = vueModele.getData();
                     String urlVue = vueModele.getUrl();
-
-                    // Ajouter les données
-                    donnees.forEach(req::setAttribute);
-
-                    RequestDispatcher dispatcher = req.getRequestDispatcher(urlVue);
-                    dispatcher.forward(req, res);
+                    String UrlError=vueModele.getUrlError();
+                    if (!erreurs.isEmpty()) {
+                        //get erreur sy submittedvalue dia atao anaty Hmap
+                        this.ajouterHashMapDansRequest(req,erreurs);
+                        this.ajouterHashMapDansRequest(req,submittedValues);
+                        RequestDispatcher dispatcher = req.getRequestDispatcher(UrlError);
+                        dispatcher.forward(req, res);
+                    }else{
+                        // Ajouter les données
+                        donnees.forEach(req::setAttribute);
+                        RequestDispatcher dispatcher = req.getRequestDispatcher(urlVue);
+                        dispatcher.forward(req, res);
+                    }
+                    
                 } else {
                     throw new ServletException("Type de retour non supporte : " + retour.getClass().getName());
                 }
@@ -138,37 +152,41 @@ public class FrontController extends HttpServlet {
         }
     } 
 
-    // Créer un objet à partir des paramètres de la requête
-    private Object creerObjetDepuisRequete(Class<?> classe, HttpServletRequest req) throws Exception {
+    // Créer-na le object amin'ny alalan'ny parametre 
+    private Object creerObjetDepuisRequete(Class<?> classe,HttpServletRequest req,HashMap<String,String> erreurs,HashMap<String,String> submittedValues) throws Exception {
         Object obj = classe.getDeclaredConstructor().newInstance();
         Field[] champs = classe.getDeclaredFields();
         
         for (Field champ : champs) {
             champ.setAccessible(true);
             String nomParam = champ.getName();
-            
             if (champ.isAnnotationPresent(FieldName.class)) {
                 FieldName annotationFieldName = champ.getAnnotation(FieldName.class);
                 nomParam = annotationFieldName.value();
             }
     
             String valeurParam = req.getParameter(nomParam);
-            
             if (valeurParam != null && !valeurParam.isEmpty()) {
-                champ.set(obj, convertirTypeChamp(champ, valeurParam,req));
+                Object valeur = convertirTypeChamp(champ, valeurParam,req,erreurs,submittedValues);
+                if (valeur != null) {
+                    champ.set(obj, valeur);
+                }
             }
         }
         return obj;
     }
+    
 
     // Convertir les valeurs des paramètres de la requête en types appropriés
-    private Object convertirTypeChamp(Field champ, String valeurParam, HttpServletRequest req) {
+    private Object convertirTypeChamp(Field champ, String valeurParam, HttpServletRequest req,HashMap<String,String> erreurs,HashMap<String,String> submittedValues) {
+        submittedValues.put(champ.getName(), valeurParam); // Conservez la valeur soumise
+        
         if (champ.isAnnotationPresent(MyNumeric.class)) {
             MyNumeric numericAnnotation = champ.getAnnotation(MyNumeric.class);
-            if (!NumericValidator.isValidNumeric(valeurParam, numericAnnotation.min(), numericAnnotation.max())) {
-                throw new RuntimeException(numericAnnotation.message());
+            if (!NumericValidator.isValidNumeric(valeurParam, numericAnnotation.min(), numericAnnotation.max()) || valeurParam==null  ) {
+                erreurs.put(champ.getName()+"Error", numericAnnotation.message());
+                return null; // Valeur par défaut si erreur
             }
-            // Convert to appropriate numeric type
             if (champ.getType() == int.class || champ.getType() == Integer.class) {
                 return Integer.parseInt(valeurParam);
             } else if (champ.getType() == double.class || champ.getType() == Double.class) {
@@ -177,15 +195,16 @@ public class FrontController extends HttpServlet {
         }
         if (champ.isAnnotationPresent(MyDate.class)) {
             MyDate dateAnnotation = champ.getAnnotation(MyDate.class);
-            if (!DateValidator.isValidDate(valeurParam, dateAnnotation.format())) {
-                throw new RuntimeException(dateAnnotation.message());
+            if (!DateValidator.isValidDate(valeurParam, dateAnnotation.format()) || valeurParam==null) {
+                erreurs.put(champ.getName()+"Error", dateAnnotation.message());
+                return null;
             }
-            // Convert to Date object if validation passes
             try {
                 SimpleDateFormat dateFormat = new SimpleDateFormat(dateAnnotation.format());
                 return dateFormat.parse(valeurParam);
             } catch (ParseException e) {
-                throw new RuntimeException("Error parsing date");
+                erreurs.put(champ.getName()+"Error", "Erreur de conversion de date.");
+                return null;
             }
         }
         Class<?> typeChamp = champ.getType();
@@ -205,9 +224,9 @@ public class FrontController extends HttpServlet {
         } else if (typeChamp == boolean.class || typeChamp == Boolean.class) {
             return Boolean.parseBoolean(valeurParam);
         }
-        // Pour les types String ou d'autres types, retournez simplement la valeur brute
         return valeurParam;
     }
+    
     
     public HashMap<String, MyMapping> getControllerList(HashMap<String, MyMapping> map, String packagename) throws Exception {
         String bin_path = "WEB-INF/classes/" + packagename.replace(".", "/");
@@ -254,5 +273,12 @@ public class FrontController extends HttpServlet {
         out.println("<h2>Error:</h2>");
         out.println("<p>" + message + "</p>");
         out.println("</body></html>");
+    }
+
+    public void ajouterHashMapDansRequest(HttpServletRequest request,HashMap<String,String> zavatra) {
+        // Ajouter chaque entrée de la HashMap en tant qu'attribut dans la requête
+        for (HashMap.Entry<String, String> entry : zavatra.entrySet()) {
+            request.setAttribute(entry.getKey(), entry.getValue());
+        }
     }
 }

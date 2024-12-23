@@ -5,6 +5,15 @@ import java.util.HashMap;
 public class ModelView {
     private String url;
     private HashMap<String, Object> data = new HashMap<>();
+    private String urlError;
+
+    public String getUrlError() {
+        return urlError;
+    }
+
+    public void setUrlError(String urlError) {
+        this.urlError = urlError;
+    }
 
     public String getUrl() {
         return url;

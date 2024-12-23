@@ -1,5 +1,6 @@
 package mg.itu.prom16;
 
+import java.util.ArrayList;
 import java.util.List;
 
 public class MyMapping {
@@ -8,6 +9,7 @@ public class MyMapping {
 
     public MyMapping(String a){
         this.setClasse(a);
+        this.list = new ArrayList<>();  // Initialize the list here
     }
 
     public String getClasse() {
