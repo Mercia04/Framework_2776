@@ -1,6 +1,6 @@
 {
     "java.project.sourcePaths": ["src"],
-    "java.project.outputPath": "bin",
+    // "java.project.outputPath": "bin",
     "java.project.referencedLibraries": [
         "lib/**/*.jar",
         "c:\\Work\\sprint\\Test\\lib\\jakarta.el-api-5.0.0.jar",
