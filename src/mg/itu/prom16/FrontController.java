@@ -91,7 +91,7 @@ public class FrontController extends HttpServlet {
                     arguments[i] = req.getParameter(annotationMyParam.name());
                 } else if (parametre.isAnnotationPresent(ParamObject.class)) {
                     arguments[i] = creerObjetDepuisRequete(parametre.getType(), req);
-                } else if (parametre.getType() == MySession.class) {
+                 } else if (parametre.getType() == MySession.class) {
                     arguments[i] = new MySession(req.getSession());
                 } else {
                     throw new ServletException("ETU002776-Mila asina annotation ny parametre");
@@ -99,37 +99,114 @@ public class FrontController extends HttpServlet {
             }
 
             Object retour = methode.invoke(instance, arguments);
-
-            //verifier_na le annotation restapi
-            if (methode.isAnnotationPresent(Restapi.class)) {
-                res.setContentType("application/json");
-                Gson gson = new Gson();
-
-                //mamadika json
-                if (retour instanceof ModelView) {
-                    ModelView vueModele = (ModelView) retour;
-                    out.print(gson.toJson(vueModele.getData()));
-                } else {
-                    out.print(gson.toJson(retour));
+            
+            // Ajouter dans la méthode processRequest avant l'invocation de la méthode
+            if (methode.isAnnotationPresent(Auth.class)) {
+                Auth auth = methode.getAnnotation(Auth.class);
+                MySession session = new MySession(req.getSession());
+                String profilUtilisateur = (String) session.get("profil");
+                
+                boolean autorise = false;
+                for (String profil : auth.profils()) {
+                    if (profil.equals(profilUtilisateur)) {
+                        autorise = true;
+                        break;
+                    }
                 }
-            } else {
-                //raha tsisy annotation @Restapi
-                if (retour instanceof String) {
-                    out.println(retour);
-                } else if (retour instanceof ModelView) {
-                    ModelView vueModele = (ModelView) retour;
-                    HashMap<String, Object> donnees = vueModele.getData();
-                    String urlVue = vueModele.getUrl();
+                if (!autorise) {
+                    res.sendRedirect("login.jsp");
+                    return;
+                }
+                else 
+                {
+                    //verifier_na le annotation restapi
+                    if (methode.isAnnotationPresent(Restapi.class)) 
+                    {
+                        res.setContentType("application/json");
+                        Gson gson = new Gson();
 
-                    // Ajouter les données
-                    donnees.forEach(req::setAttribute);
+                        //mamadika json
+                        if (retour instanceof ModelView)
+                        {
+                            ModelView vueModele = (ModelView) retour;
+                            out.print(gson.toJson(vueModele.getData()));
+                        } 
+                        else 
+                        {
+                            out.print(gson.toJson(retour));
+                        }
+                    } 
+                    else 
+                    {
+                        //raha tsisy annotation @Restapi
+                        if (retour instanceof String) 
+                        {
+                            out.println(retour);
+                        } 
+                        else if (retour instanceof ModelView) 
+                        {
+                            ModelView vueModele = (ModelView) retour;
+                            HashMap<String, Object> donnees = vueModele.getData();
+                            String urlVue = vueModele.getUrl();
 
-                    RequestDispatcher dispatcher = req.getRequestDispatcher(urlVue);
-                    dispatcher.forward(req, res);
-                } else {
-                    throw new ServletException("Type de retour non supporte : " + retour.getClass().getName());
+                            // Ajouter les données
+                            donnees.forEach(req::setAttribute);
+
+                            RequestDispatcher dispatcher = req.getRequestDispatcher(urlVue);
+                            dispatcher.forward(req, res);
+                        }
+                        else 
+                        {
+                            throw new ServletException("Type de retour non supporte : " + retour.getClass().getName());
+                        }
+                    }
+                } 
+            }
+            else
+            {
+                //verifier_na le annotation restapi
+                if (methode.isAnnotationPresent(Restapi.class)) 
+                {
+                    res.setContentType("application/json");
+                    Gson gson = new Gson();
+
+                    //mamadika json
+                    if (retour instanceof ModelView)
+                    {
+                        ModelView vueModele = (ModelView) retour;
+                        out.print(gson.toJson(vueModele.getData()));
+                    } 
+                    else 
+                    {
+                        out.print(gson.toJson(retour));
+                    }
+                } 
+                else 
+                {
+                    //raha tsisy annotation @Restapi
+                    if (retour instanceof String) 
+                    {
+                        out.println(retour);
+                    } 
+                    else if (retour instanceof ModelView) 
+                    {
+                        ModelView vueModele = (ModelView) retour;
+                        HashMap<String, Object> donnees = vueModele.getData();
+                        String urlVue = vueModele.getUrl();
+
+                        // Ajouter les données
+                        donnees.forEach(req::setAttribute);
+
+                        RequestDispatcher dispatcher = req.getRequestDispatcher(urlVue);
+                        dispatcher.forward(req, res);
+                    }
+                    else 
+                    {
+                        throw new ServletException("Type de retour non supporte : " + retour.getClass().getName());
+                    }
                 }
             }
+            
         } catch (ServletException e) {
             gererErreur(req, res, e.getMessage());
         } catch (Exception e) {
@@ -256,3 +333,4 @@ public class FrontController extends HttpServlet {
         out.println("</body></html>");
     }
 }
+
