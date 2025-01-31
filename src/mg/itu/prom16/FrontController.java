@@ -195,12 +195,8 @@ public class FrontController extends HttpServlet {
                         String urlVue = vueModele.getUrl();
 
                         // Ajouter les données
-<<<<<<< Updated upstream
                         donnees.forEach(req::setAttribute);
 
-=======
-                        donnees.forEach(req::setAttribute); 
->>>>>>> Stashed changes
                         RequestDispatcher dispatcher = req.getRequestDispatcher(urlVue);
                         dispatcher.forward(req, res);
                     }
