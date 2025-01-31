@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project name="Framework_2776" default="deploy" basedir=".">
+
+    <property name="work.dir" value="${basedir}"/>
+    <property name="lib.dir" value="F:/work/sprint/Test/lib"/>
+    <property name="src.dir" value="${work.dir}/src"/>
+    <property name="temp.dir" value="${work.dir}/src_temp"/>
+    <property name="target.dir" value="${work.dir}/bin"/>
+    <property name="jar.dir" value="${work.dir}/jars"/>
+    <property name="manifest.file" value="${target.dir}/MANIFEST.MF"/>
+
+    <path id="compile.classpath">
+        <fileset dir="${lib.dir}">
+            <include name="**/*.jar"/>
+        </fileset>
+    </path>
+
+    <target name="init">
+        <delete dir="${temp.dir}"/>
+        <delete dir="${target.dir}"/>
+        <delete dir="${jar.dir}"/>
+        <echo message="Init Done"/>
+    </target>
+
+    <target name="create-dirs" depends="init">
+        <mkdir dir="${temp.dir}"/>
+        <mkdir dir="${target.dir}"/>
+        <mkdir dir="${jar.dir}"/>
+        <echo message="Directories created" />
+    </target>
+
+    <target name="copy-java-files" depends="create-dirs">
+        <copy todir="${temp.dir}">
+            <fileset dir="${src.dir}/mg/itu/prom16" includes="**/*.java"/>
+        </copy>
+    </target>
+
+    <target name="compile-java" depends="copy-java-files">
+        <javac srcdir="${temp.dir}" 
+            destdir="${target.dir}" 
+            classpathref="compile.classpath" 
+            includeantruntime="false"
+            debug="true">
+            <compilerarg value="-parameters"/>
+            <compilerarg value="-Xlint:unchecked"/>
+        </javac>    
+    </target>
+
+
+    <target name="create-manifest" depends="compile-java">
+        <manifest file="${manifest.file}">
+            <attribute name="Built-By" value="Framework_2776"/>
+            <attribute name="Implementation-Version" value="1.0"/>
+        </manifest>
+    </target>
+
+    <target name="create-jar" depends="create-manifest">
+        <jar destfile="${jar.dir}/framework_2776.jar" 
+             basedir="${target.dir}"
+             manifest="${manifest.file}"/>
+    </target>
+
+    <target name="clean" depends="create-jar">
+        <delete dir="${temp.dir}"/>
+        <delete dir="${target.dir}"/>
+        <delete file="${manifest.file}"/>
+        <echo message="Clean done."/>
+    </target>
+
+    <target name="deploy" depends="clean">
+        <echo message="Build completed successfully."/>
+    </target>
+
+</project>
