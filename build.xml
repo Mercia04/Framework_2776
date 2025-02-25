@@ -2,7 +2,7 @@
 <project name="Framework_2776" default="deploy" basedir=".">
 
     <property name="work.dir" value="${basedir}"/>
-    <property name="lib.dir" value="c:/Work/sprint/Test/lib"/>
+    <property name="lib.dir" value="F:/work/sprint/Test/lib"/>
     <property name="src.dir" value="${work.dir}/src"/>
     <property name="temp.dir" value="${work.dir}/src_temp"/>
     <property name="target.dir" value="${work.dir}/bin"/>

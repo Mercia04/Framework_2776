@@ -105,18 +105,19 @@ public class FrontController extends HttpServlet {
             }
 
             Object retour = methode.invoke(instance, arguments);
-
-            //verifier_na le annotation restapi
-            if (methode.isAnnotationPresent(Restapi.class)) {
-                res.setContentType("application/json");
-                Gson gson = new Gson();
-
-                //mamadika json
-                if (retour instanceof ModelView) {
-                    ModelView vueModele = (ModelView) retour;
-                    out.print(gson.toJson(vueModele.getData()));
-                } else {
-                    out.print(gson.toJson(retour));
+            
+            // Ajouter dans la méthode processRequest avant l'invocation de la méthode
+            if (methode.isAnnotationPresent(Auth.class)) {
+                Auth auth = methode.getAnnotation(Auth.class);
+                MySession session = new MySession(req.getSession());
+                String profilUtilisateur = (String) session.get("profil");
+                
+                boolean autorise = false;
+                for (String profil : auth.profils()) {
+                    if (profil.equals(profilUtilisateur)) {
+                        autorise = true;
+                        break;
+                    }
                 }
             } else {
                 //raha tsisy annotation @Restapi
@@ -144,6 +145,7 @@ public class FrontController extends HttpServlet {
                     throw new ServletException("Type de retour non supporte : " + retour.getClass().getName());
                 }
             }
+            
         } catch (ServletException e) {
             gererErreur(req, res, e.getMessage());
         } catch (Exception e) {
@@ -153,7 +155,7 @@ public class FrontController extends HttpServlet {
     } 
 
     // Créer-na le object amin'ny alalan'ny parametre 
-    private Object creerObjetDepuisRequete(Class<?> classe,HttpServletRequest req,HashMap<String,String> erreurs,HashMap<String,String> submittedValues) throws Exception {
+    private Object creerObjetDepuisRequete(Class<?> classe, HttpServletRequest req, HashMap<String,String> erreurs, HashMap<String,String> submittedValues) throws Exception {
         Object obj = classe.getDeclaredConstructor().newInstance();
         Field[] champs = classe.getDeclaredFields();
         
@@ -166,21 +168,27 @@ public class FrontController extends HttpServlet {
             }
     
             String valeurParam = req.getParameter(nomParam);
-            if (valeurParam != null && !valeurParam.isEmpty()) {
-                Object valeur = convertirTypeChamp(champ, valeurParam,req,erreurs,submittedValues);
-                if (valeur != null) {
-                    champ.set(obj, valeur);
-                }
+            Object valeur = convertirTypeChamp(champ, valeurParam, req, erreurs, submittedValues);
+            if (valeur != null) {
+                champ.set(obj, valeur);
             }
         }
         return obj;
     }
+    
     
 
     // Convertir les valeurs des paramètres de la requête en types appropriés
     private Object convertirTypeChamp(Field champ, String valeurParam, HttpServletRequest req,HashMap<String,String> erreurs,HashMap<String,String> submittedValues) {
         submittedValues.put(champ.getName(), valeurParam); // Conservez la valeur soumise
         
+        if (champ.isAnnotationPresent(MyRequired.class)) {
+            MyRequired requiredAnnotation = champ.getAnnotation(MyRequired.class);
+            if (valeurParam == null || valeurParam.trim().isEmpty()) {
+                erreurs.put(champ.getName()+"Error", requiredAnnotation.message());
+                return null;
+            }
+        }
         if (champ.isAnnotationPresent(MyNumeric.class)) {
             MyNumeric numericAnnotation = champ.getAnnotation(MyNumeric.class);
             if (!NumericValidator.isValidNumeric(valeurParam, numericAnnotation.min(), numericAnnotation.max()) || valeurParam==null  ) {
@@ -193,6 +201,8 @@ public class FrontController extends HttpServlet {
                 return Double.parseDouble(valeurParam);
             }
         }
+        
+
         if (champ.isAnnotationPresent(MyDate.class)) {
             MyDate dateAnnotation = champ.getAnnotation(MyDate.class);
             if (!DateValidator.isValidDate(valeurParam, dateAnnotation.format()) || valeurParam==null) {
@@ -207,6 +217,9 @@ public class FrontController extends HttpServlet {
                 return null;
             }
         }
+        if (valeurParam == null || valeurParam.trim().isEmpty()) {
+            return null;
+        }    
         Class<?> typeChamp = champ.getType();
         if (typeChamp == FileUpload.class) {
             try {
@@ -282,3 +295,4 @@ public class FrontController extends HttpServlet {
         }
     }
 }
+
