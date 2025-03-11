@@ -5,9 +5,9 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
+// Annotation à utiliser sur les paramètres de méthode
 @Retention(RetentionPolicy.RUNTIME)
-@Target(ElementType.FIELD)
-public @interface MyDate {
-    String format() default "yyyy-MM-dd"; 
-    String message() default "Invalid date format";
+@Target(ElementType.PARAMETER)
+public @interface MyParam {
+    String name();
 }

@@ -110,17 +110,14 @@ public class FrontController extends HttpServlet {
             if (methode.isAnnotationPresent(Auth.class)) {
                 Auth auth = methode.getAnnotation(Auth.class);
                 MySession session = new MySession(req.getSession());
-                String profilUtilisateur = (String) session.get("profil");
+                String profilUtilisateur = (String) session.getAttribute("profil");
                 
-                // boolean autorise = false;
+                boolean autorise = false;
                 for (String profil : auth.profils()) {
                     if (profil.equals(profilUtilisateur)) {
-                        // autorise = true;
-                        //apina zavatra 
-                        
+                        autorise = true;
                         break;
                     }
-                    //apina else rehefa tsy autoriser le profil
                 }
             } else {
                 //raha tsisy annotation @Restapi

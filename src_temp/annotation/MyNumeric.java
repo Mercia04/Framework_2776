@@ -7,7 +7,9 @@ import java.lang.annotation.Target;
 
 @Retention(RetentionPolicy.RUNTIME)
 @Target(ElementType.FIELD)
-public @interface MyDate {
-    String format() default "yyyy-MM-dd"; 
-    String message() default "Invalid date format";
+public @interface MyNumeric {
+    double min() default Double.MIN_VALUE;
+    double max() default Double.MAX_VALUE;
+    String message() default "Invalid numeric value";
 }
+

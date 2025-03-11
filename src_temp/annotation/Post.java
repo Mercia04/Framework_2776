@@ -1,13 +1,11 @@
 package mg.itu.prom16.annotation;
-
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
 @Retention(RetentionPolicy.RUNTIME)
-@Target(ElementType.FIELD)
-public @interface MyDate {
-    String format() default "yyyy-MM-dd"; 
-    String message() default "Invalid date format";
+@Target({ElementType.TYPE , ElementType.METHOD})
+public @interface Post {
+    
 }

@@ -7,7 +7,6 @@ import java.lang.annotation.Target;
 
 @Retention(RetentionPolicy.RUNTIME)
 @Target(ElementType.FIELD)
-public @interface MyDate {
-    String format() default "yyyy-MM-dd"; 
-    String message() default "Invalid date format";
+public @interface MyRequired {
+    String message() default "Obligatoire";
 }
