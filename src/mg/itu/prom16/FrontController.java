@@ -105,6 +105,19 @@ public class FrontController extends HttpServlet {
             }
 
             Object retour = methode.invoke(instance, arguments);
+
+            //verifier_na le annotation restapi
+            if (methode.isAnnotationPresent(Restapi.class)) {
+                res.setContentType("application/json");
+                Gson gson = new Gson();
+                //mamadika json
+                if (retour instanceof ModelView) {
+                    ModelView vueModele = (ModelView) retour;
+                    out.print(gson.toJson(vueModele.getData()));
+                } else {
+                    out.print(gson.toJson(retour));
+                }
+            }
             
             // Ajouter dans la méthode processRequest avant l'invocation de la méthode
             if (methode.isAnnotationPresent(Auth.class)) {
@@ -116,9 +129,37 @@ public class FrontController extends HttpServlet {
                 for (String profil : auth.profils()) {
                     if (profil.equals(profilUtilisateur)) {
                         // autorise = true;
+                        if (retour instanceof String) {
+                            out.println(retour);
+                        } 
+                        else if (retour instanceof ModelView) {
+                            ModelView vueModele = (ModelView) retour;
+                            if (vueModele.getUrl().startsWith("redirect:")) {
+                                String redirectUrl = vueModele.getUrl().substring(9); 
+                                res.sendRedirect(redirectUrl);
+                                return;
+                            }
+                            HashMap<String, Object> donnees = vueModele.getData();
+                            String urlVue = vueModele.getUrl();
+                            String UrlError=vueModele.getUrlError();
+                            if (!erreurs.isEmpty()) {
+                                //get erreur sy submittedvalue dia atao anaty Hmap
+                                this.ajouterHashMapDansRequest(req,erreurs);
+                                this.ajouterHashMapDansRequest(req,submittedValues);
+                                RequestDispatcher dispatcher = req.getRequestDispatcher(UrlError);
+                                dispatcher.forward(req, res);
+                            }else{
+                                // Ajouter les données
+                                donnees.forEach(req::setAttribute);
+                                RequestDispatcher dispatcher = req.getRequestDispatcher(urlVue);
+                                dispatcher.forward(req, res);
+                            }
+                        }
                         //apina zavatra 
                         
                         break;
+                    }else {
+                        throw new ServletException("La methode n'est pas autorisée pour le profil : " + profil);
                     }
                     //apina else rehefa tsy autoriser le profil
                 }
@@ -128,6 +169,11 @@ public class FrontController extends HttpServlet {
                     out.println(retour);
                 } else if (retour instanceof ModelView) {
                     ModelView vueModele = (ModelView) retour;
+                    if (vueModele.getUrl().startsWith("redirect:")) {
+                        String redirectUrl = vueModele.getUrl().substring(9); 
+                        res.sendRedirect(redirectUrl);
+                        return;
+                    }
                     HashMap<String, Object> donnees = vueModele.getData();
                     String urlVue = vueModele.getUrl();
                     String UrlError=vueModele.getUrlError();
