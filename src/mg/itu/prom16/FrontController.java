@@ -105,6 +105,25 @@ public class FrontController extends HttpServlet {
             }
 
             Object retour = methode.invoke(instance, arguments);
+
+            //verifier_na le annotation restapi
+            if (methode.isAnnotationPresent(Restapi.class)) {
+                res.setContentType("application/json");
+                Gson gson = new Gson();
+                //mamadika json
+                if (retour instanceof ModelView) {
+                    ModelView vueModele = (ModelView) retour;
+                    out.print(gson.toJson(vueModele.getData()));
+                } else if(retour instanceof byte[]){
+                    res.setContentType("application/pdf");
+                    res.setHeader("Content-Disposition", "inline; filename=\"document.pdf\"");
+                    res.getOutputStream().write((byte[]) retour);
+                    res.getOutputStream().flush();
+
+                } else {
+                    out.print(gson.toJson(retour));
+                }
+            }
             
             // Ajouter dans la méthode processRequest avant l'invocation de la méthode
             if (methode.isAnnotationPresent(Auth.class)) {
@@ -145,6 +164,7 @@ public class FrontController extends HttpServlet {
                     throw new ServletException("Type de retour non supporte : " + retour.getClass().getName());
                 }
             }
+            
             
         } catch (ServletException e) {
             gererErreur(req, res, e.getMessage());
